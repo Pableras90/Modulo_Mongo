@@ -145,10 +145,86 @@ db.listingsAndReviews.aggregate([
 ### Opcional
 
 Queremos saber el precio medio de alquiler de Airbnb en España.
+```
+use("airbnb");
+
+
+db.listingsAndReviews.aggregate([
+  {
+    $match: {
+      "address.country": "Spain"
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      mediaEspaña: { $avg: { $toDouble: "$price" } },
+      count: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      mediaEspaña: 1,
+      count: 1
+    }
+  }
+]);
+```
 
 ¿Y si quisiéramos hacer como el anterior, pero sacarlo por países?
+```
+db.listingsAndReviews.aggregate([
+
+  {
+    $group: {
+      _id: "$address.country",
+      mediaPrecio: { $avg: { $toDouble: "$price" } },
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      pais: "$_id",
+      mediaPrecio:1
+    }
+  }
+]);
+```
+
 
 Repite los mismos pasos pero agrupando también por número de habitaciones.
+use("airbnb");
+
+```
+db.listingsAndReviews.aggregate([
+
+    {
+      $group: {
+        _id:{pais: "$address.country",numHabitaciones:"$bedrooms"},
+
+        mediaPrecio: { $avg: { $toDouble: "$price" } },
+
+       
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        pais: "$_id.pais",
+        numHabitaciones: "$_id.numHabitaciones",
+        mediaPrecio:1
+      }
+    },
+     {
+        $sort:{
+            pais:1,
+            numHabitaciones:1
+        }
+     }
+]);
+```    
+
 
 ### Desafio
 
@@ -156,3 +232,42 @@ Queremos mostrar el top 5 de apartamentos más caros en España, y sacar los sig
 - Nombre.
 - Ciudad.
 - Amenities, pero en vez de un array, un string con todos los amenities.
+
+```
+db.listingsAndReviews.aggregate([
+    {
+      $match: {
+        "address.country": "Spain"
+
+      }
+    },
+    
+    {
+        $project: {
+          _id: 0,
+          ciudad:"$host.host_location",
+          price: { $toDouble: "$price" },
+          extras:{
+            $reduce:{
+                input:"$amenities",
+                initialValue:"",
+                in:{
+                    $concat:[
+                        "$$value",
+                    { $cond: [{ $eq: ["$$value", ""] }, "", ", "] },
+                        "$$this"
+                    ]
+
+                }}
+            }}
+        },
+        {
+            $sort:{
+                price:-1,
+            }
+         },
+         {
+            $limit:5,
+         }
+  ]);
+```
